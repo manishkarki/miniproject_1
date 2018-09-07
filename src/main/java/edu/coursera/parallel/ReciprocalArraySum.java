@@ -2,7 +2,6 @@ package edu.coursera.parallel;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.RecursiveAction;
 
 /**
@@ -87,7 +86,7 @@ public final class ReciprocalArraySum {
      * created to perform reciprocal array sum in parallel.
      */
     private static class ReciprocalArraySumTask extends RecursiveAction {
-    	static int THRESHOLD = 1000000;
+    	static int THRESHOLD = 1000;
         /**
          * Starting index for traversal done by this task.
          */
@@ -129,18 +128,9 @@ public final class ReciprocalArraySum {
 
         @Override
         protected void compute() {
-            if(endIndexExclusive - startIndexInclusive <= THRESHOLD) {
-            	for(int i = startIndexInclusive; i < endIndexExclusive; i++) {
-            		value += 1/input[i];
-				}
-			} else {
-            	int mid = (startIndexInclusive + endIndexExclusive)/ 2;
-            	ReciprocalArraySumTask firstHalf = new ReciprocalArraySumTask(startIndexInclusive, mid, input);
-            	ReciprocalArraySumTask secondHalf = new ReciprocalArraySumTask(mid, endIndexExclusive, input);
-            	firstHalf.fork();
-            	secondHalf.compute();
-            	firstHalf.join();
-            	value = firstHalf.value + secondHalf.value;
+			value = 0 ;
+			for(int i = startIndexInclusive ; i < endIndexExclusive ; i++) {
+				value += 1/input[i];
 			}
         }
     }
@@ -157,11 +147,17 @@ public final class ReciprocalArraySum {
     protected static double parArraySum(final double[] input) {
         assert input.length % 2 == 0;
 
-//        ReciprocalArraySumTask reciprocalArraySumTask = new ReciprocalArraySumTask(0, input.length,input);
-//		ForkJoinPool.commonPool().invoke(reciprocalArraySumTask);
-        double sum = parManyTaskArraySum(input, 2);
-        return sum;
-    }
+        double sum;
+		ReciprocalArraySumTask firstHalf = new ReciprocalArraySumTask(0, input.length/2, input);
+		ReciprocalArraySumTask secondHalf = new ReciprocalArraySumTask(input.length/2, input.length, input);
+		firstHalf.fork();
+		secondHalf.compute();
+		firstHalf.join();
+
+		sum = firstHalf.getValue() + secondHalf.getValue();
+
+		return sum;
+	}
 
     /**
      * TODO: Extend the work you did to implement parArraySum to use a set
