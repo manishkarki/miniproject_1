@@ -1,5 +1,8 @@
 package edu.coursera.parallel;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.RecursiveAction;
 
 /**
@@ -84,6 +87,7 @@ public final class ReciprocalArraySum {
      * created to perform reciprocal array sum in parallel.
      */
     private static class ReciprocalArraySumTask extends RecursiveAction {
+    	static int THRESHOLD = 1000000;
         /**
          * Starting index for traversal done by this task.
          */
@@ -125,7 +129,19 @@ public final class ReciprocalArraySum {
 
         @Override
         protected void compute() {
-            // TODO
+            if(endIndexExclusive - startIndexInclusive <= THRESHOLD) {
+            	for(int i = startIndexInclusive; i < endIndexExclusive; i++) {
+            		value += 1/input[i];
+				}
+			} else {
+            	int mid = (startIndexInclusive + endIndexExclusive)/ 2;
+            	ReciprocalArraySumTask firstHalf = new ReciprocalArraySumTask(startIndexInclusive, mid, input);
+            	ReciprocalArraySumTask secondHalf = new ReciprocalArraySumTask(mid, endIndexExclusive, input);
+            	firstHalf.fork();
+            	secondHalf.compute();
+            	firstHalf.join();
+            	value = firstHalf.value + secondHalf.value;
+			}
         }
     }
 
@@ -141,13 +157,9 @@ public final class ReciprocalArraySum {
     protected static double parArraySum(final double[] input) {
         assert input.length % 2 == 0;
 
-        double sum = 0;
-
-        // Compute sum of reciprocals of array elements
-        for (int i = 0; i < input.length; i++) {
-            sum += 1 / input[i];
-        }
-
+//        ReciprocalArraySumTask reciprocalArraySumTask = new ReciprocalArraySumTask(0, input.length,input);
+//		ForkJoinPool.commonPool().invoke(reciprocalArraySumTask);
+        double sum = parManyTaskArraySum(input, 2);
         return sum;
     }
 
@@ -166,10 +178,27 @@ public final class ReciprocalArraySum {
         double sum = 0;
 
         // Compute sum of reciprocals of array elements
-        for (int i = 0; i < input.length; i++) {
-            sum += 1 / input[i];
-        }
+		List<ReciprocalArraySumTask> tasks = new ArrayList<>(numTasks);
+		for(int i = 0 ; i < numTasks; i++) {
+			int startIndex = getChunkStartInclusive(i, numTasks, input.length);
+			int endIndex = getChunkEndExclusive(i, numTasks, input.length);
+			tasks.add(new ReciprocalArraySumTask(startIndex, endIndex, input));
+		}
 
-        return sum;
-    }
+		//Parallelize
+		for (int i=0; i<numTasks-1; i++){
+			tasks.get(i).fork();
+		}
+		tasks.get(numTasks-1).compute();
+
+		for(int i=0; i<numTasks-1; i++){
+			tasks.get(i).join();
+		}
+
+		for(int i=0; i<numTasks; i++){
+			sum += tasks.get(i).getValue();
+		}
+
+		return sum;
+	}
 }
